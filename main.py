@@ -375,7 +375,7 @@ def signal_handler(sig, frame):
 def button_pressed_callback(channel):
 	print("Button pressed!")
 	global cycleCount
-	cycleCount =(cycleCount+1)%10
+	cycleCount =(cycleCount+1)%11
 	print(cycleCount)
 
 
@@ -399,6 +399,18 @@ def rainbowcycle(wait):
 		pixels.show()
 		time.sleep(wait)
 	print("finished cycle");
+	
+def rainbowcycle2(wait):
+	print("Rainbow cycling")
+	global cycleCount
+	for j in range(255):
+	    if cycleCount !=10:
+		    print("cycleCountChanged")
+		    return()
+	    pixels.fill((colourwheel.wheel(j)))
+	    pixels.show()
+	    time.sleep(wait)
+	print("finished cycle");
 
 if __name__ == "__main__":
 	GPIO.add_event_detect(BUTTON_GPIO, GPIO.FALLING, 
@@ -407,7 +419,6 @@ if __name__ == "__main__":
 		if cycleCount ==0:
 			off.LEDsOff()
 		elif cycleCount==1:
-			uniquePixels = config.N_PIXELS
 			rainbowcycle(0.01)
 		elif cycleCount==2:
 			visualization_type = visualize_scroll
@@ -468,5 +479,7 @@ if __name__ == "__main__":
 		elif cycleCount==9:
 			pixels.fill((255,0,255))
 			pixels.show()
+		elif cycleCount==10:
+			rainbowcycle2(0.1)
 	signal.signal(signal.SIGINT, signal_handler)
 	signal.pause()
