@@ -4,7 +4,7 @@ Code adapted from: https://github.com/naztronaut/dancyPi-audio-reactive-led
 
 Setup: 
 -Lights data cable attached to GPIO pin 18.
--Button attached between GPIO pin 18 and ground. 
+-Button attached between GPIO pin 16 and ground. 
 -Edit code in 'config' so N_PIXELS is equal to length of LED strip
 
 To use, run function 'main'.
