@@ -124,6 +124,7 @@ def createFilters():
     global p
     global p_filt
     global uniquePixels
+    global _prev_spectrum
 
     r_filt = dsp.ExpFilter(np.tile(0.01, uniquePixels),
                              alpha_decay=0.2, alpha_rise=0.99)
@@ -136,9 +137,12 @@ def createFilters():
     p_filt = dsp.ExpFilter(np.tile(1, (3, uniquePixels)),
                              alpha_decay=0.1, alpha_rise=0.99)
     p = np.tile(1.0, (3, uniquePixels))
+    _prev_spectrum = np.tile(0.01, uniquePixels)
 
 gain = dsp.ExpFilter(np.tile(0.01, config.N_FFT_BINS),
                      alpha_decay=0.001, alpha_rise=0.99)
+
+
 
 
 def visualize_scroll(y):
@@ -148,16 +152,19 @@ def visualize_scroll(y):
     gain.update(y)
     y /= gain.value
     y *= 255.0
-    r = int(np.max(y[:len(y) // 3]))
-    g = int(np.max(y[len(y) // 3: 2 * len(y) // 3]))
-    b = int(np.max(y[2 * len(y) // 3:]))
+    r = int(np.max(y[:4*len(y) // 15]))
+    b = int(np.max(y[4*len(y) // 15: 9*len(y) // 15]))
+    g = int(np.max(y[ 9*len(y) // 15:]))
+#    r = int(np.max(y[:3*len(y) // 8]))
+ #   g = int(np.max(y[3*len(y) // 8: 5*len(y) // 8]))
+  #  b = int(np.max(y[ 5*len(y) // 8:]))
     # Scrolling effect window
     p[:, 1:] = p[:, :-1]
     p *=0.89
     p = gaussian_filter1d(p, sigma=0.2)
     # Create new color originating at the center
-    p[0, 0] = r
-    p[1, 0] = g
+    p[0, 0] = g
+    p[1, 0] = r
     p[2, 0] = b
     # Update the LED strip
     return np.concatenate((p, p[:, ::-1], p, p[:, ::-1] ), axis=1)
@@ -222,7 +229,7 @@ def visualize_energy2(y):
     # Scale by the width of the LED strip
     y *= float(uniquePixels - 1)
     # Map color channels according to energy in the different freq bands
-    scale = 0.97
+    scale = 0.90
     r = int(np.mean(y[:len(y) // 3]**scale))
     g = int(np.mean(y[len(y) // 3: 2 * len(y) // 3]**scale))
     b = int(np.mean(y[2 * len(y) // 3:]**scale))
@@ -242,7 +249,7 @@ def visualize_energy2(y):
     # Set the new pixel value
     return np.concatenate((p, p), axis=1)
     
-_prev_spectrum = np.tile(0.01, uniquePixels)
+
 
 
 def visualize_spectrum(y):
@@ -336,7 +343,7 @@ samples_per_frame = int(config.MIC_RATE / config.FPS)
 # Array containing the rolling audio sample window
 y_roll = np.random.rand(config.N_ROLLING_HISTORY, samples_per_frame) / 1e16
 
-def start_stream(callback,cycleCountInput):
+def start_stream(callback,cycleCountInput,timer):
     p = pyaudio.PyAudio()
     frames_per_buffer = int(config.MIC_RATE / config.FPS)
     stream = p.open(format=pyaudio.paInt16,
@@ -346,6 +353,7 @@ def start_stream(callback,cycleCountInput):
                     frames_per_buffer=frames_per_buffer)
     overflows = 0
     prev_ovf_time = time.time()
+    timestart = time.time()
     while True:
         if cycleCount!=cycleCountInput:
             print("cycleCountChanged")
@@ -353,6 +361,12 @@ def start_stream(callback,cycleCountInput):
             stream.close()
             p.terminate()
             return()
+        if timer==1:
+            if time.time()-timestart >=10:
+                stream.stop_stream()
+                stream.close()
+                p.terminate()
+                return()
         try:
             y = np.fromstring(stream.read(frames_per_buffer, exception_on_overflow=False), dtype=np.int16)
             y = y.astype(np.float32)
@@ -375,7 +389,7 @@ def signal_handler(sig, frame):
 def button_pressed_callback(channel):
 	print("Button pressed!")
 	global cycleCount
-	cycleCount =(cycleCount+1)%11
+	cycleCount =(cycleCount+1)%12
 	print(cycleCount)
 
 
@@ -384,7 +398,7 @@ def rainbowcycle(wait):
 	global cycleCount
 	for j in range(255):
 		for i in range(config.N_PIXELS):
-			if cycleCount !=1:
+			if cycleCount !=11:
 				print("cycleCountChanged")
 				return()
 				
@@ -419,7 +433,63 @@ if __name__ == "__main__":
 		if cycleCount ==0:
 			off.LEDsOff()
 		elif cycleCount==1:
-			rainbowcycle(0.01)
+			visualization_type = visualize_scroll
+			visualization_effect = visualization_type
+			uniquePixels = config.N_PIXELS // 4
+			createFilters()
+			led.update()
+			start_stream(microphone_update,1,1)
+			
+			visualization_type = visualize_scroll2
+			visualization_effect = visualization_type
+			uniquePixels = config.N_PIXELS // 2
+			createFilters()
+			"""Visualization effect to display on the LED strip"""
+			# Initialize LEDs
+			led.update()
+			# Start listening to live audio stream
+			start_stream(microphone_update,1,1)
+			
+			visualization_type = visualize_energy
+			visualization_effect = visualization_type
+			uniquePixels = config.N_PIXELS //4
+			createFilters()
+			"""Visualization effect to display on the LED strip"""
+			# Initialize LEDs
+			led.update()
+			# Start listening to live audio stream
+			start_stream(microphone_update,1,1)
+			
+			visualization_type = visualize_energy2
+			visualization_effect = visualization_type
+			uniquePixels = config.N_PIXELS //2
+			createFilters()
+			"""Visualization effect to display on the LED strip"""
+			# Initialize LEDs
+			led.update()
+			# Start listening to live audio stream
+			start_stream(microphone_update,1,1)
+			
+			visualization_type = visualize_energy2
+			visualization_effect = visualization_type
+			uniquePixels = config.N_PIXELS //2
+			createFilters()
+			"""Visualization effect to display on the LED strip"""
+			# Initialize LEDs
+			led.update()
+			# Start listening to live audio stream
+			start_stream(microphone_update,1,1)
+			
+			visualization_type = visualize_spectrum
+			visualization_effect = visualization_type
+			uniquePixels = config.N_PIXELS + 10
+			createFilters()
+			"""Visualization effect to display on the LED strip"""
+			# Initialize LEDs
+			led.update()
+			# Start listening to live audio stream
+			start_stream(microphone_update,1,1)
+			
 		elif cycleCount==2:
 			visualization_type = visualize_scroll
 			visualization_effect = visualization_type
@@ -429,7 +499,7 @@ if __name__ == "__main__":
 			# Initialize LEDs
 			led.update()
 			# Start listening to live audio stream
-			start_stream(microphone_update,2)
+			start_stream(microphone_update,2,0)
 		elif cycleCount==3:
 			visualization_type = visualize_scroll2
 			visualization_effect = visualization_type
@@ -439,7 +509,7 @@ if __name__ == "__main__":
 			# Initialize LEDs
 			led.update()
 			# Start listening to live audio stream
-			start_stream(microphone_update,cycleCount)
+			start_stream(microphone_update,3,0)
 		elif cycleCount==4:
 			visualization_type = visualize_energy
 			visualization_effect = visualization_type
@@ -449,7 +519,7 @@ if __name__ == "__main__":
 			# Initialize LEDs
 			led.update()
 			# Start listening to live audio stream
-			start_stream(microphone_update,4)
+			start_stream(microphone_update,4,0)
 		elif cycleCount==5:
 			visualization_type = visualize_energy2
 			visualization_effect = visualization_type
@@ -459,17 +529,17 @@ if __name__ == "__main__":
 			# Initialize LEDs
 			led.update()
 			# Start listening to live audio stream
-			start_stream(microphone_update,5)
+			start_stream(microphone_update,5,0)
 		elif cycleCount==6:
 			visualization_type = visualize_spectrum
 			visualization_effect = visualization_type
-			uniquePixels = config.N_PIXELS
+			uniquePixels = config.N_PIXELS + 0
 			createFilters()
 			"""Visualization effect to display on the LED strip"""
 			# Initialize LEDs
 			led.update()
 			# Start listening to live audio stream
-			start_stream(microphone_update,6)
+			start_stream(microphone_update,6,0)
 		elif cycleCount==7:
 			pixels.fill((255,0,0))
 			pixels.show()
@@ -481,5 +551,7 @@ if __name__ == "__main__":
 			pixels.show()
 		elif cycleCount==10:
 			rainbowcycle2(0.1)
+		elif cycleCount==11:
+			rainbowcycle(0.01)
 	signal.signal(signal.SIGINT, signal_handler)
 	signal.pause()
